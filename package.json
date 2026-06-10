@@ -1,0 +1,44 @@
+{
+  "name": "hyper-http-proxy-gui",
+  "version": "1.0.0",
+  "description": "Expose your HTTP services over peer to peer connections with a friendly electron based graphical interface",
+  "keywords": [
+    "hypercore",
+    "p2p",
+    "proxy",
+    "http"
+  ],
+  "homepage": "https://github.com/RangerMauve/hyper-http-proxy-gui#readme",
+  "bugs": {
+    "url": "https://github.com/RangerMauve/hyper-http-proxy-gui/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RangerMauve/hyper-http-proxy-gui.git"
+  },
+  "license": "MIT",
+  "author": "RangerMauve",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint --fix && tsc",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "hyper-http-fetch": "^1.0.3",
+    "hypercore-id-encoding": "^1.3.0",
+    "hyperdht": "^6.32.0",
+    "mime": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/streamx": "^2.9.5",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
+  }
+}
