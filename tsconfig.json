@@ -11,11 +11,10 @@
     "outDir": "dist",
     "checkJs": true,
     "allowJs": true,
-    "rootDir": "src",
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "useUnknownInCatchVariables":false
   },
-  "include": ["src/**/*.js", "types/**/*.d.ts"],
+  "include": ["src/**/*.js", "types/**/*.d.ts", "test/**/*.js"],
   "exclude": ["node_modules", "dist"]
 }
