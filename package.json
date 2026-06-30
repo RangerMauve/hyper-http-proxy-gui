@@ -34,7 +34,7 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@types/streamx": "^2.9.5",
-    "electron": "^42.4.0",
+    "electron": "^42.5.1",
     "electron-builder": "^26.15.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
