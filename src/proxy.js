@@ -68,6 +68,10 @@ export class HyperHttpProxy {
    * @returns {Promise<string>} URL of service
    */
   async exposeLocalPort(port, seed = randomBytes(32)) {
+    if (this.#localPorts.has(port)) {
+      throw new Error(`Port ${port} is already exposed`);
+    }
+
     const keyPair = Hyperdht.keyPair(seed);
     // TODO: Try to fetch from the port to check if it exists
     const server = this.#dht.createServer(
@@ -79,7 +83,10 @@ export class HyperHttpProxy {
       },
     );
 
+    await server.listen(keyPair);
+
     const destroy = async () => {
+      this.#localPorts.delete(port);
       await server.close();
     };
 
@@ -97,6 +104,10 @@ export class HyperHttpProxy {
    * @returns {Promise<number>}
    */
   async exposeRemoteAsLocal(url, defaultPort = 0) {
+    if (this.#remoteProxies.has(url)) {
+      throw new Error(`URL ${url} is already exposed`);
+    }
+
     const publicKey = parseURL(url);
 
     const server = net.createServer({ allowHalfOpen: true }, (stream) => {
@@ -139,15 +150,24 @@ export class HyperHttpProxy {
    * @returns {Promise<string>} URL of service
    */
   async exposeFolder(rootFolder, seed = randomBytes(32)) {
+    if (this.#folders.has(rootFolder)) {
+      throw new Error(`Folder ${rootFolder} is already exposed`);
+    }
+
     const server = await makeFileServer({
       dht: this.#dht,
       seed,
       rootFolder,
     });
 
+    const destroy = async () => {
+      this.#folders.delete(rootFolder);
+      await server.destroy();
+    };
+
     this.#folders.set(rootFolder, {
-      seed: seed,
-      destroy: server.destroy,
+      seed,
+      destroy,
     });
 
     return makeURL(server.keyPair.publicKey);
@@ -162,7 +182,6 @@ export class HyperHttpProxy {
 
     await Promise.all(toDestroy.map((destroy) => destroy()));
   }
-
   /**
    * @returns {ProxyJSONLocalPorts}
    */
