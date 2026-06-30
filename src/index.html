@@ -20,3 +20,33 @@
     <li><button id="addFolder">➕ Add</button></li>
   </ul>
 </section>
+
+<script type="module">
+  async function loadState() {
+    const state = await window.proxyApi.toJSON();
+
+    const localList = document.getElementById("localPorts");
+    const remoteList = document.getElementById("remotePorts");
+    const folderList = document.getElementById("folderPorts");
+
+    for (const [port, seed] of Object.entries(state.localPorts)) {
+      const li = document.createElement("li");
+      li.textContent = `Port ${port} → ${seed}`;
+      localList.appendChild(li);
+    }
+
+    for (const [url, port] of Object.entries(state.remoteProxies)) {
+      const li = document.createElement("li");
+      li.textContent = `${port} → ${url}`;
+      remoteList.appendChild(li);
+    }
+
+    for (const [folder, seed] of Object.entries(state.folders)) {
+      const li = document.createElement("li");
+      li.textContent = `${folder} → ${seed}`;
+      folderList.appendChild(li);
+    }
+  }
+
+  loadState();
+</script>
