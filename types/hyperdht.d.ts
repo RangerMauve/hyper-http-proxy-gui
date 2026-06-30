@@ -320,3 +320,8 @@ declare module 'hyperdht/testnet' {
 
   export default function createTestnet(size?: number, opts?: TestnetOptions): Promise<Testnet>
 }
+
+declare module 'hyperdht/testnet.js' {
+  export * from 'hyperdht/testnet'
+  export { default } from 'hyperdht/testnet'
+}
