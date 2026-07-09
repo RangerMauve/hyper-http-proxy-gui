@@ -84,13 +84,19 @@ const dht = new Hyperdht();
 const proxy = new HyperHttpProxy({ dht });
 
 ipcMain.handle("proxy:exposeLocalPort", (_, port, seedHex) =>
-  proxy.exposeLocalPort(port, seedHex ? Buffer.from(seedHex, "hex") : undefined),
+  proxy.exposeLocalPort(
+    port,
+    seedHex ? Buffer.from(seedHex, "hex") : undefined,
+  ),
 );
 ipcMain.handle("proxy:exposeRemoteAsLocal", (_, url, defaultPort) =>
   proxy.exposeRemoteAsLocal(url, defaultPort),
 );
 ipcMain.handle("proxy:exposeFolder", (_, rootFolder, seedHex) =>
-  proxy.exposeFolder(rootFolder, seedHex ? Buffer.from(seedHex, "hex") : undefined),
+  proxy.exposeFolder(
+    rootFolder,
+    seedHex ? Buffer.from(seedHex, "hex") : undefined,
+  ),
 );
 ipcMain.handle("proxy:destroy", () => proxy.destroy());
 ipcMain.handle("proxy:toJSON", () => proxy.toJSON());

@@ -5,7 +5,10 @@
  * @param {number} [opts.timeout] - ms to wait (default 3000)
  * @param {number} [opts.interval] - ms between attempts (default 200)
  */
-export async function assertEventually(check, { timeout = 1000, interval = 200 } = {}) {
+export async function assertEventually(
+  check,
+  { timeout = 1000, interval = 200 } = {},
+) {
   const start = Date.now();
   let lastError;
   while (Date.now() - start < timeout) {

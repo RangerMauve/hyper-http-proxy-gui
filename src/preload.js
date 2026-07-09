@@ -1,10 +1,17 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("proxyApi", {
-  exposeLocalPort: (port, seedHex) => ipcRenderer.invoke("proxy:exposeLocalPort", port, seedHex),
-  exposeRemoteAsLocal: (url, defaultPort) => ipcRenderer.invoke("proxy:exposeRemoteAsLocal", url, defaultPort),
-  exposeFolder: (rootFolder, seedHex) => ipcRenderer.invoke("proxy:exposeFolder", rootFolder, seedHex),
+  /** @type {(port: number, seedHex: string) => Promise<void>} */
+  exposeLocalPort: (port, seedHex) =>
+    ipcRenderer.invoke("proxy:exposeLocalPort", port, seedHex),
+  /** @type {(url: string, defaultPort: number) => Promise<void>} */
+  exposeRemoteAsLocal: (url, defaultPort) =>
+    ipcRenderer.invoke("proxy:exposeRemoteAsLocal", url, defaultPort),
+  /** @type {(rootFolder: string, seedHex: string) => Promise<void>} */
+  exposeFolder: (rootFolder, seedHex) =>
+    ipcRenderer.invoke("proxy:exposeFolder", rootFolder, seedHex),
   destroy: () => ipcRenderer.invoke("proxy:destroy"),
   toJSON: () => ipcRenderer.invoke("proxy:toJSON"),
+  /** @type {(json: object) => Promise<void>} */
   loadJSON: (json) => ipcRenderer.invoke("proxy:loadJSON", json),
 });
