@@ -21,7 +21,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "test": "node --test test/*.test.js && npx electron test/ui.js",
+    "test": "node --test test/*.test.js && xvfb-run --auto-servernum npx electron --no-sandbox test/ui.js",
     "lint": "eslint --fix && tsc --noEmit",
     "start": "electron ."
   },
