@@ -1,5 +1,5 @@
 {
-  "name": "hyper-http-proxy-gui",
+  "name": "setkamost",
   "version": "1.0.0",
   "description": "Expose your HTTP services over peer to peer connections with a friendly electron based graphical interface",
   "keywords": [
@@ -8,13 +8,13 @@
     "proxy",
     "http"
   ],
-  "homepage": "https://github.com/RangerMauve/hyper-http-proxy-gui#readme",
+  "homepage": "https://github.com/RangerMauve/setkamost#readme",
   "bugs": {
-    "url": "https://github.com/RangerMauve/hyper-http-proxy-gui/issues"
+    "url": "https://github.com/RangerMauve/setkamost/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RangerMauve/hyper-http-proxy-gui.git"
+    "url": "git+https://github.com/RangerMauve/setkamost.git"
   },
   "license": "MIT",
   "author": "RangerMauve",

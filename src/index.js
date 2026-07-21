@@ -51,7 +51,7 @@ app.whenReady().then(() => {
     },
   ]);
 
-  tray.setToolTip("Hyper HTTP Proxy");
+  tray.setToolTip("Setkamost");
   tray.setContextMenu(contextMenu);
 
   tray.on("click", () => {

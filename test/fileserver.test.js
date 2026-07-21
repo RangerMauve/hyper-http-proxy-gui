@@ -65,10 +65,7 @@ test("fileserver serves index.html content", async (t) => {
   );
 
   const body = await res.text();
-  assert.ok(
-    body.includes("Hyper HTTP Proxy"),
-    "Body contains expected HTML content",
-  );
+  assert.ok(body.includes("Setkamost"), "Body contains expected HTML content");
 });
 
 test("resolveFile rejects path traversal (../README.md) in the path", async (t) => {

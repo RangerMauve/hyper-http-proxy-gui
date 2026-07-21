@@ -1,2 +1,2 @@
-# hyper-http-proxy-gui
+# setkamost
 Expose your HTTP services over peer to peer connections with a friendly electron based graphical interface

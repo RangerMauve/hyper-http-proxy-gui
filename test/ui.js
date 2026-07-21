@@ -26,7 +26,7 @@ describe("UI", () => {
     win.loadFile(join(__dirname, "..", "src", "index.html"));
     await once(win.webContents, "dom-ready");
     const title = await win.webContents.executeJavaScript("document.title");
-    assert.equal(title, "Hyper HTTP Proxy");
+    assert.equal(title, "Setkamost");
     win.close();
   });
 
@@ -116,7 +116,7 @@ describe("UI", () => {
       await new Promise((r) => setTimeout(r, 200));
 
       const log = await formWin.webContents.executeJavaScript(
-        "window.proxyApi.getCallLog()"
+        "window.proxyApi.getCallLog()",
       );
       assert.equal(log.length, 1);
       assert.equal(log[0].method, "exposeLocalPort");
@@ -139,7 +139,7 @@ describe("UI", () => {
       await new Promise((r) => setTimeout(r, 200));
 
       const log = await formWin.webContents.executeJavaScript(
-        "window.proxyApi.getCallLog()"
+        "window.proxyApi.getCallLog()",
       );
       assert.equal(log.length, 1);
       assert.equal(log[0].method, "exposeRemoteAsLocal");
@@ -162,7 +162,7 @@ describe("UI", () => {
       await new Promise((r) => setTimeout(r, 200));
 
       const log = await formWin.webContents.executeJavaScript(
-        "window.proxyApi.getCallLog()"
+        "window.proxyApi.getCallLog()",
       );
       assert.equal(log.length, 1);
       assert.equal(log[0].method, "exposeRemoteAsLocal");
@@ -184,7 +184,7 @@ describe("UI", () => {
       await new Promise((r) => setTimeout(r, 200));
 
       const log = await formWin.webContents.executeJavaScript(
-        "window.proxyApi.getCallLog()"
+        "window.proxyApi.getCallLog()",
       );
       assert.equal(log.length, 1);
       assert.equal(log[0].method, "exposeFolder");
