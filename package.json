@@ -19,11 +19,19 @@
   "license": "MIT",
   "author": "RangerMauve",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/proxy.js",
+  "exports": {
+    ".": "./src/proxy.js"
+  },
   "scripts": {
     "test": "node --test test/*.test.js && xvfb-run --auto-servernum npx electron --no-sandbox test/ui.js",
     "lint": "eslint --fix && tsc --noEmit",
-    "start": "electron ."
+    "start": "electron src/index.js"
+  },
+  "build": {
+    "extraMetadata": {
+      "main": "src/index.js"
+    }
   },
   "dependencies": {
     "hyper-http-fetch": "^1.0.3",
