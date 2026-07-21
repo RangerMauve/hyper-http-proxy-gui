@@ -4,21 +4,28 @@
 <p>Status: <span>loading</span></p>
 <section>
   <h2>Expose Local</h2>
-  <ul id="localPorts">
-    <li><button id="addLocal">➕ Add</button></li>
-  </ul>
+  <ul id="localPorts"></ul>
+  <form id="addLocalPort">
+    <input type="number" name="port" placeholder="Local port (e.g. 3000)" required min="1" max="65535" />
+    <button type="submit">➕ Expose</button>
+  </form>
 </section>
 <section>
   <h2>Expose Remote As Local</h2>
-  <ul id="remotePorts">
-    <li><button id="addRemote">➕ Add</button></li>
-  </ul>
+  <ul id="remotePorts"></ul>
+  <form id="addRemotePort">
+    <input type="text" name="url" placeholder="Remote URL (e.g. hyper://…)" required />
+    <input type="number" name="defaultPort" placeholder="Local port (optional)" min="0" max="65535" />
+    <button type="submit">➕ Expose</button>
+  </form>
 </section>
 <section>
   <h2>Share Folders</h2>
-  <ul id="folderPorts">
-    <li><button id="addFolder">➕ Add</button></li>
-  </ul>
+  <ul id="folderPorts"></ul>
+  <form id="addFolder">
+    <input type="text" name="rootFolder" placeholder="Folder path (e.g. /home/user/data)" required />
+    <button type="submit">➕ Expose</button>
+  </form>
 </section>
 
 <script type="module">
@@ -28,6 +35,10 @@
     const localList = document.getElementById("localPorts");
     const remoteList = document.getElementById("remotePorts");
     const folderList = document.getElementById("folderPorts");
+
+    localList.innerHTML = "";
+    remoteList.innerHTML = "";
+    folderList.innerHTML = "";
 
     for (const [port, seed] of Object.entries(state.localPorts)) {
       const li = document.createElement("li");
@@ -47,6 +58,31 @@
       folderList.appendChild(li);
     }
   }
+
+  document.getElementById("addLocalPort").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    await window.proxyApi.exposeLocalPort(Number(formData.get("port")), "");
+    e.target.reset();
+    await loadState();
+  });
+
+  document.getElementById("addRemotePort").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const port = formData.get("defaultPort") ? Number(formData.get("defaultPort")) : 0;
+    await window.proxyApi.exposeRemoteAsLocal(formData.get("url"), port);
+    e.target.reset();
+    await loadState();
+  });
+
+  document.getElementById("addFolder").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    await window.proxyApi.exposeFolder(formData.get("rootFolder"), "");
+    e.target.reset();
+    await loadState();
+  });
 
   loadState();
 </script>
