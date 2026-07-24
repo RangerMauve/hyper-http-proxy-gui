@@ -1,14 +1,39 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain } from "electron";
+import { connect } from "node:net";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { JsonRpc } from "./jsonrpc.js";
+import { Daemon } from "./daemon.js";
 import Hyperdht from "hyperdht";
 import { HyperHttpProxy } from "./proxy.js";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import xdg from "xdg-portable";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** @type {import("xdg-portable").XDG} */
+// @ts-ignore default export is callable at runtime but types differ
+const xdgInstance = xdg;
+
+function defaultSocketPath() {
+  const runtime = xdgInstance.runtime();
+  const baseDir = runtime || join(xdgInstance.state(), "setkamost");
+  return join(baseDir, "sock");
+}
+
+const SOCKET_PATH = defaultSocketPath();
 
 let tray = null;
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
+
+/** @type {JsonRpc | null} */
+let rpcClient = null;
+/** @type {Daemon | null} */
+let daemon = null;
+/** @type {boolean} */
+let ownsDaemon = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -28,7 +53,53 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+/**
+ * Connect to an existing daemon or start a new one.
+ * Returns the initial proxy state so the window can load with data ready.
+ */
+async function ensureDaemon() {
+  // Try connecting to an existing daemon
+  if (existsSync(SOCKET_PATH)) {
+    try {
+      rpcClient = await connectToDaemon(SOCKET_PATH);
+      ownsDaemon = false;
+      const result = await rpcClient.call("list");
+      return result;
+    } catch {
+      // Existing socket but daemon not responding — will start a new one
+    }
+  }
+
+  // No running daemon — start one in-process
+  const dht = new Hyperdht();
+  const proxy = new HyperHttpProxy({ dht });
+  daemon = new Daemon({ proxy, socketPath: SOCKET_PATH });
+  await daemon.start();
+
+  // Connect our own client to it
+  rpcClient = await connectToDaemon(SOCKET_PATH);
+  ownsDaemon = true;
+  const result = await rpcClient.call("list");
+  return result;
+}
+
+/**
+ * @param {string} socketPath
+ * @returns {Promise<JsonRpc>}
+ */
+function connectToDaemon(socketPath) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(socketPath, () => {
+      resolve(new JsonRpc(socket));
+    });
+    socket.on("error", reject);
+  });
+}
+
+app.whenReady().then(async () => {
+  const initialState = await ensureDaemon();
+  console.log("Daemon ready", initialState);
+
   createWindow();
 
   tray = new Tray(join(__dirname, "../assets/tray-icon.png"));
@@ -64,9 +135,13 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", async () => {
-  console.log("Destroying proxy before quit...");
-  await proxy.destroy();
-  console.log("Proxy destroyed.");
+  if (rpcClient) {
+    rpcClient.destroy();
+    rpcClient = null;
+  }
+  if (ownsDaemon && daemon) {
+    await daemon.stop();
+  }
 });
 
 app.on("window-all-closed", () => {
@@ -79,25 +154,49 @@ app.on("activate", () => {
   }
 });
 
-// ponytail: DHT + proxy as module-level singletons; no factory needed
-const dht = new Hyperdht();
-const proxy = new HyperHttpProxy({ dht });
-
-ipcMain.handle("proxy:exposeLocalPort", (_, port, seedHex) =>
-  proxy.exposeLocalPort(
+// IPC handlers — all go through the daemon's JSON-RPC
+ipcMain.handle("proxy:exposeLocalPort", async (_, port, seedHex) => {
+  return getRpc().call("exposeLocalPort", [
     port,
-    seedHex ? Buffer.from(seedHex, "hex") : undefined,
-  ),
-);
-ipcMain.handle("proxy:exposeRemoteAsLocal", (_, url, defaultPort) =>
-  proxy.exposeRemoteAsLocal(url, defaultPort),
-);
-ipcMain.handle("proxy:exposeFolder", (_, rootFolder, seedHex) =>
-  proxy.exposeFolder(
+    seedHex ? seedHex : undefined,
+  ]);
+});
+
+ipcMain.handle("proxy:exposeRemoteAsLocal", async (_, url, defaultPort) => {
+  return getRpc().call("exposeRemoteAsLocal", [url, defaultPort || 0]);
+});
+
+ipcMain.handle("proxy:exposeFolder", async (_, rootFolder, seedHex) => {
+  return getRpc().call("exposeFolder", [
     rootFolder,
-    seedHex ? Buffer.from(seedHex, "hex") : undefined,
-  ),
-);
-ipcMain.handle("proxy:destroy", () => proxy.destroy());
-ipcMain.handle("proxy:toJSON", () => proxy.toJSON());
-ipcMain.handle("proxy:loadJSON", (_, json) => proxy.loadJSON(json));
+    seedHex ? seedHex : undefined,
+  ]);
+});
+
+ipcMain.handle("proxy:destroy", async () => {
+  if (ownsDaemon && daemon) {
+    await daemon.stop();
+  }
+  if (rpcClient) {
+    rpcClient.destroy();
+    rpcClient = null;
+  }
+});
+
+ipcMain.handle("proxy:toJSON", async () => {
+  return getRpc().call("list");
+});
+
+// loadJSON is not a daemon RPC method — proxy doesn't expose it
+// For now, pass through (no-op) since state management is handled by the daemon
+ipcMain.handle("proxy:loadJSON", () => Promise.resolve());
+
+/**
+ * Assert the RPC client is connected and return it.
+ * @returns {JsonRpc}
+ * @throws {Error} when rpc client is not available
+ */
+function getRpc() {
+  if (!rpcClient) throw new Error("Daemon not connected");
+  return rpcClient;
+}

@@ -12,7 +12,9 @@ import { MockProxy } from "../test/fixtures/mock-proxy.js";
  * @returns {Promise<{ log: string; err: string; exitCode: number | null }>}
  */
 async function runCli(fn) {
+  /** @type {string[]} */
   const logChunks = [];
+  /** @type {string[]} */
   const errChunks = [];
   let exitCode = null;
 
@@ -21,10 +23,18 @@ async function runCli(fn) {
   const origExit = process.exit;
 
   console.log = (...args) => {
-    logChunks.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    logChunks.push(
+      args
+        .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+        .join(" "),
+    );
   };
   console.error = (...args) => {
-    errChunks.push(args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    errChunks.push(
+      args
+        .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+        .join(" "),
+    );
   };
   process.exit = (code) => {
     exitCode = code;
@@ -81,7 +91,7 @@ describe("CLI", () => {
   describe("expose-local", () => {
     it("exposes a local port and returns a URL", async () => {
       const { log } = await runCli(() =>
-        run({ env, args: ["expose-local", "18932"] })
+        run({ env, args: ["expose-local", "18932"] }),
       );
       assert.equal(log.trim(), "hyper+http://mock18932/");
     });
@@ -98,8 +108,13 @@ describe("CLI", () => {
       const { log } = await runCli(() =>
         run({
           env,
-          args: ["expose-remote", "hyper+http://testremote/", "--port", "18933"],
-        })
+          args: [
+            "expose-remote",
+            "hyper+http://testremote/",
+            "--port",
+            "18933",
+          ],
+        }),
       );
       assert.equal(log.trim(), "18933");
     });
@@ -109,7 +124,7 @@ describe("CLI", () => {
       const state = JSON.parse(log);
       assert.ok(
         state.remoteProxies["hyper+http://testremote/"],
-        "should have remote proxy"
+        "should have remote proxy",
       );
     });
   });
@@ -117,7 +132,7 @@ describe("CLI", () => {
   describe("expose-folder", () => {
     it("exposes a folder and returns a URL", async () => {
       const { log } = await runCli(() =>
-        run({ env, args: ["expose-folder", "/tmp/sharedocs"] })
+        run({ env, args: ["expose-folder", "/tmp/sharedocs"] }),
       );
       assert.equal(log.trim(), "hyper+http://mocksharedocs/");
     });
@@ -140,14 +155,14 @@ describe("CLI", () => {
 
     it("prints list help", async () => {
       const { log } = await runCli(() =>
-        run({ env, args: ["list", "--help"] })
+        run({ env, args: ["list", "--help"] }),
       );
       assert.ok(log.includes("List all exposed services"));
     });
 
     it("prints expose-local help", async () => {
       const { log } = await runCli(() =>
-        run({ env, args: ["expose-local", "--help"] })
+        run({ env, args: ["expose-local", "--help"] }),
       );
       assert.ok(log.includes("Expose a local HTTP port"));
     });
@@ -156,7 +171,7 @@ describe("CLI", () => {
   describe("error cases", () => {
     it("unknown command prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["bogus"] })
+        run({ env, args: ["bogus"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("Unknown command: bogus"));
@@ -164,7 +179,7 @@ describe("CLI", () => {
 
     it("missing daemon subcommand prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["daemon"] })
+        run({ env, args: ["daemon"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("missing subcommand"));
@@ -172,7 +187,7 @@ describe("CLI", () => {
 
     it("unknown daemon subcommand prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["daemon", "restart"] })
+        run({ env, args: ["daemon", "restart"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("Unknown daemon subcommand: restart"));
@@ -180,7 +195,7 @@ describe("CLI", () => {
 
     it("expose-local with missing port prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["expose-local"] })
+        run({ env, args: ["expose-local"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("missing <port> argument"));
@@ -188,7 +203,7 @@ describe("CLI", () => {
 
     it("expose-remote with missing url prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["expose-remote"] })
+        run({ env, args: ["expose-remote"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("missing <url> argument"));
@@ -196,7 +211,7 @@ describe("CLI", () => {
 
     it("expose-folder with missing path prints error and exits 1", async () => {
       const { err, exitCode } = await runCli(() =>
-        run({ env, args: ["expose-folder"] })
+        run({ env, args: ["expose-folder"] }),
       );
       assert.equal(exitCode, 1);
       assert.ok(err.includes("missing <path> argument"));
