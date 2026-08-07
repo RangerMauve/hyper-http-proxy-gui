@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { Duplex } from "node:stream";
+import { createInterface } from "node:readline";
 
 /**
  * @typedef {object} JsonRequest
@@ -42,10 +43,6 @@ export class JsonRpc extends EventEmitter {
   #handlers = new Map();
   /** @type {number} */
   #nextId = 1;
-  /** @type {Buffer} */
-  #buffer;
-  /** @type {number} */
-  #used = 0;
 
   /**
    * @param {Duplex} stream - Duplex stream to communicate over
@@ -53,8 +50,8 @@ export class JsonRpc extends EventEmitter {
   constructor(stream) {
     super();
     this.#stream = stream;
-    this.#buffer = Buffer.alloc(8192); // 8KB initial
-    this.#onData();
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+    rl.on("line", (line) => this.#handleMessage(line));
     this.#onClose();
   }
 
@@ -97,42 +94,6 @@ export class JsonRpc extends EventEmitter {
   notify(method, params = []) {
     const request = { jsonrpc: "2.0", method, params };
     this.#stream.write(JSON.stringify(request) + "\n");
-  }
-
-  /**
-   * Feed incoming data from the stream.
-   */
-  #onData() {
-    this.#stream.on("data", (chunk) => {
-      // Grow buffer if needed
-      if (this.#used + chunk.length > this.#buffer.length) {
-        const newSize = Math.max(
-          this.#buffer.length * 2,
-          this.#used + chunk.length,
-        );
-        const newBuf = Buffer.alloc(newSize);
-        this.#buffer.copy(newBuf, 0, 0, this.#used);
-        this.#buffer = newBuf;
-      }
-      chunk.copy(this.#buffer, this.#used);
-      this.#used += chunk.length;
-
-      // Extract complete lines and compact
-      let start = 0;
-      let newlineIdx;
-      while ((newlineIdx = this.#buffer.indexOf(10, start)) !== -1) {
-        // 10 = '\n'
-        const line = this.#buffer.toString("utf8", start, newlineIdx);
-        start = newlineIdx + 1;
-        this.#handleMessage(line);
-      }
-      // Compact: move remaining bytes to front
-      const remaining = this.#used - start;
-      if (remaining > 0) {
-        this.#buffer.copy(this.#buffer, 0, start, this.#used);
-      }
-      this.#used = remaining;
-    });
   }
 
   /**
