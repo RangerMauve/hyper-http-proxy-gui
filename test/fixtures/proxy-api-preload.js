@@ -13,4 +13,5 @@ const MOCK_STATE = {
 
 contextBridge.exposeInMainWorld("proxyApi", {
   toJSON: () => MOCK_STATE,
+  selectFolder: async () => "/tmp/share",
 });

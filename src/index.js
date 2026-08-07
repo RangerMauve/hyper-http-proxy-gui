@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain } from "electron";
+import { app, BrowserWindow, Tray, Menu, ipcMain, dialog } from "electron";
 import { connect } from "node:net";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -190,6 +190,14 @@ ipcMain.handle("proxy:toJSON", async () => {
 // loadJSON is not a daemon RPC method — proxy doesn't expose it
 // For now, pass through (no-op) since state management is handled by the daemon
 ipcMain.handle("proxy:loadJSON", () => Promise.resolve());
+
+ipcMain.handle("selectFolder", async () => {
+  // @ts-expect-error The rpc can't get called without a window
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory"],
+  });
+  return result.filePaths[0] || null;
+});
 
 /**
  * Assert the RPC client is connected and return it.

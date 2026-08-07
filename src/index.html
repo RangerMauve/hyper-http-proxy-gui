@@ -23,7 +23,8 @@
   <h2>Share Folders</h2>
   <ul id="folderPorts"></ul>
   <form id="addFolder">
-    <input type="text" name="rootFolder" placeholder="Folder path (e.g. /home/user/data)" required />
+    <input type="text" placeholder="Path to folder" name="rootFolder" />
+    <button type="button" id="selectFolderBtn">📁 Choose Folder</button>
     <button type="submit">➕ Expose</button>
   </form>
 </section>
@@ -76,11 +77,19 @@
     await loadState();
   });
 
-  document.getElementById("addFolder").addEventListener("submit", async (e) => {
+  const addFolderForm = document.getElementById("addFolder");
+  const folderInput = addFolderForm.querySelector('[name="rootFolder"]');
+
+  document.getElementById("selectFolderBtn").addEventListener("click", async () => {
+    const path = await window.proxyApi.selectFolder();
+    if (path) folderInput.value = path;
+  });
+
+  addFolderForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    await window.proxyApi.exposeFolder(formData.get("rootFolder"), "");
-    e.target.reset();
+    if (!folderInput.value) return;
+    await window.proxyApi.exposeFolder(folderInput.value, "");
+    folderInput.value = "";
     await loadState();
   });
 

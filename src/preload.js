@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("proxyApi", {
   /** @type {(port: number, seedHex: string) => Promise<void>} */
@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("proxyApi", {
   exposeFolder: (rootFolder, seedHex) =>
     ipcRenderer.invoke("proxy:exposeFolder", rootFolder, seedHex),
   destroy: () => ipcRenderer.invoke("proxy:destroy"),
+  /** @type {() => Promise<string | null>} */
+  selectFolder: () => ipcRenderer.invoke("selectFolder"),
   toJSON: () => ipcRenderer.invoke("proxy:toJSON"),
   /** @type {(json: object) => Promise<void>} */
   loadJSON: (json) => ipcRenderer.invoke("proxy:loadJSON", json),

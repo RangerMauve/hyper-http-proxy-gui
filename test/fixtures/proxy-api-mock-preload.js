@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("proxyApi", {
 
   destroy: () => {},
   loadJSON: () => {},
+  selectFolder: async () => "/mock/selected/folder",
   getCallLog: () => [...callLog],
   clearCallLog: () => {
     callLog.length = 0;
