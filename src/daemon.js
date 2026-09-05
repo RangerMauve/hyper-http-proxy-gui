@@ -1,6 +1,6 @@
 import { createServer } from "node:net";
-import { existsSync, unlinkSync, writeFileSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { JsonRpc } from "./jsonrpc.js";
 
 /**
@@ -8,8 +8,22 @@ import { JsonRpc } from "./jsonrpc.js";
  */
 
 /**
- * @typedef {Pick<HyperHttpProxy, "toJSON" | "exposeLocalPort" | "exposeRemoteAsLocal" | "exposeFolder">} ProxyMethods
+ * @typedef {Pick<HyperHttpProxy, "toJSON" | "loadJSON" | "list" | "exposeLocalPort" | "exposeRemoteAsLocal" | "exposeFolder">} ProxyMethods
  */
+
+/**
+ * Async existence check (fs/promises has no `exists`).
+ * @param {string} path
+ * @returns {Promise<boolean>}
+ */
+async function fileExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Unix domain socket server exposing proxy methods via JSON-RPC.
@@ -19,6 +33,8 @@ export class Daemon {
   #proxy;
   /** @type {string} */
   #socketPath;
+  /** @type {string} */
+  #storagePath;
   /** @type {import("net").Server | null} */
   #server = null;
 
@@ -26,10 +42,12 @@ export class Daemon {
    * @param {object} options
    * @param {ProxyMethods} options.proxy - Proxy instance to expose
    * @param {string} options.socketPath - Path for the Unix domain socket
+   * @param {string} options.storagePath - Directory used to persist state (state.json)
    */
-  constructor({ proxy, socketPath }) {
+  constructor({ proxy, socketPath, storagePath }) {
     this.#proxy = proxy;
     this.#socketPath = socketPath;
+    this.#storagePath = storagePath;
   }
 
   /**
@@ -37,9 +55,12 @@ export class Daemon {
    * @returns {Promise<string>} Resolved socket path
    */
   async start() {
+    // Restore persisted proxy state before accepting connections
+    await this.#loadState();
+
     // Clean up stale socket file
-    if (existsSync(this.#socketPath)) {
-      unlinkSync(this.#socketPath);
+    if (await fileExists(this.#socketPath)) {
+      await unlink(this.#socketPath);
     }
 
     return new Promise((resolve, reject) => {
@@ -53,10 +74,11 @@ export class Daemon {
       });
 
       this.#server.listen(this.#socketPath, () => {
-        // Write PID file
+        // Write PID file, then signal ready once it's on disk
         const pidPath = this.#socketPath + ".pid";
-        writeFileSync(pidPath, String(process.pid));
-        /** @type {(v: string) => void} */ resolve(this.#socketPath);
+        writeFile(pidPath, String(process.pid))
+          .then(() => resolve(this.#socketPath))
+          .catch(reject);
       });
     });
   }
@@ -65,25 +87,23 @@ export class Daemon {
    * Stop the server and clean up.
    */
   async stop() {
-    /** @type {Promise<void>} */
-    const promise = new Promise((resolve, reject) => {
-      /** @type {(err?: Error) => void} */
-      const done = (err) => {
-        this.#server = null;
-        this.#cleanup();
-        if (err) reject(err);
-        else resolve();
-      };
+    // Persist final proxy state before shutting down
+    await this.#saveState();
 
+    /** @type {Promise<void>} */
+    const closed = new Promise((resolve, reject) => {
       if (!this.#server) {
-        this.#cleanup();
-        done();
+        resolve();
         return;
       }
-
-      this.#server.close(done);
+      this.#server.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
-    return promise;
+    await closed;
+    this.#server = null;
+    await this.#cleanup();
   }
 
   /**
@@ -93,35 +113,47 @@ export class Daemon {
   #onConnection(socket) {
     const rpc = new JsonRpc(socket);
 
-    rpc.register("list", () => this.#proxy.toJSON());
+    rpc.register("list", () => this.#proxy.list());
     /**
      * @param {unknown} port
      * @param {unknown} seedHex
      */
-    const handleExposeLocalPort = (port, seedHex) =>
-      this.#proxy.exposeLocalPort(
+    const handleExposeLocalPort = async (port, seedHex) => {
+      const result = await this.#proxy.exposeLocalPort(
         Number(port),
         /** @type {Buffer | undefined} */ (seedHex || undefined),
       );
+      await this.#saveState();
+      return result;
+    };
     rpc.register("exposeLocalPort", handleExposeLocalPort);
 
     /**
      * @param {unknown} url
      * @param {unknown} port
      */
-    const handleExposeRemoteAsLocal = (url, port) =>
-      this.#proxy.exposeRemoteAsLocal(String(url), port ? Number(port) : 0);
+    const handleExposeRemoteAsLocal = async (url, port) => {
+      const result = await this.#proxy.exposeRemoteAsLocal(
+        String(url),
+        port ? Number(port) : 0,
+      );
+      await this.#saveState();
+      return result;
+    };
     rpc.register("exposeRemoteAsLocal", handleExposeRemoteAsLocal);
 
     /**
      * @param {unknown} rootFolder
      * @param {unknown} seedHex
      */
-    const handleExposeFolder = (rootFolder, seedHex) =>
-      this.#proxy.exposeFolder(
+    const handleExposeFolder = async (rootFolder, seedHex) => {
+      const result = await this.#proxy.exposeFolder(
         String(rootFolder),
         /** @type {Buffer | undefined} */ (seedHex || undefined),
       );
+      await this.#saveState();
+      return result;
+    };
     rpc.register("exposeFolder", handleExposeFolder);
 
     socket.on("error", () => {
@@ -130,16 +162,58 @@ export class Daemon {
   }
 
   /**
-   * Clean up socket and PID files.
+   * Absolute path to the persisted state file.
+   * @returns {string}
    */
-  #cleanup() {
+  #stateFile() {
+    return join(this.#storagePath, "state.json");
+  }
+
+  /**
+   * Restore persisted proxy state from storage, if a state file exists.
+   * @returns {Promise<void>}
+   */
+  async #loadState() {
+    try {
+      const stateFile = this.#stateFile();
+      if (!(await fileExists(stateFile))) return;
+      const raw = await readFile(stateFile, "utf8");
+      /** @type {Parameters<ProxyMethods["loadJSON"]>[0]} */
+      const state = JSON.parse(raw);
+      await this.#proxy.loadJSON(state);
+    } catch {
+      // A missing or corrupt state file must not prevent startup
+    }
+  }
+
+  /**
+   * Persist the current proxy state to storage.
+   * @returns {Promise<void>}
+   */
+  async #saveState() {
+    try {
+      await mkdir(this.#storagePath, { recursive: true });
+      await writeFile(
+        this.#stateFile(),
+        JSON.stringify(this.#proxy.toJSON(), null, 2),
+      );
+    } catch {
+      // Best effort — persistence must not break the RPC or shutdown
+    }
+  }
+
+  /**
+   * Clean up socket and PID files.
+   * @returns {Promise<void>}
+   */
+  async #cleanup() {
     try {
       const pidPath = this.#socketPath + ".pid";
-      if (existsSync(pidPath)) {
-        unlinkSync(pidPath);
+      if (await fileExists(pidPath)) {
+        await unlink(pidPath);
       }
-      if (existsSync(this.#socketPath)) {
-        unlinkSync(this.#socketPath);
+      if (await fileExists(this.#socketPath)) {
+        await unlink(this.#socketPath);
       }
     } catch {
       // Best effort cleanup

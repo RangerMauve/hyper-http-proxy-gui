@@ -4,7 +4,7 @@ import { JsonRpc } from "./jsonrpc.js";
 import { Daemon } from "./daemon.js";
 import Hyperdht from "hyperdht";
 import { HyperHttpProxy } from "./proxy.js";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import xdg from "xdg-portable";
 
 /**
@@ -129,7 +129,8 @@ Options:
 async function daemonStart(socketPath) {
   const dht = new Hyperdht();
   const proxy = new HyperHttpProxy({ dht });
-  const daemon = new Daemon({ proxy, socketPath });
+  const storagePath = join(xdgInstance.data(), "setkamost");
+  const daemon = new Daemon({ proxy, socketPath, storagePath });
 
   await daemon.start();
   console.log(`Daemon started (socket: ${socketPath})`);

@@ -73,7 +73,8 @@ async function ensureDaemon() {
   // No running daemon — start one in-process
   const dht = new Hyperdht();
   const proxy = new HyperHttpProxy({ dht });
-  daemon = new Daemon({ proxy, socketPath: SOCKET_PATH });
+  const storagePath = app.getPath("userData");
+  daemon = new Daemon({ proxy, socketPath: SOCKET_PATH, storagePath });
   await daemon.start();
 
   // Connect our own client to it
@@ -184,6 +185,10 @@ ipcMain.handle("proxy:destroy", async () => {
 });
 
 ipcMain.handle("proxy:toJSON", async () => {
+  return getRpc().call("list");
+});
+
+ipcMain.handle("proxy:list", async () => {
   return getRpc().call("list");
 });
 

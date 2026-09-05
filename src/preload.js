@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("proxyApi", {
   /** @type {() => Promise<string | null>} */
   selectFolder: () => ipcRenderer.invoke("selectFolder"),
   toJSON: () => ipcRenderer.invoke("proxy:toJSON"),
+  list: () => ipcRenderer.invoke("proxy:list"),
   /** @type {(json: object) => Promise<void>} */
   loadJSON: (json) => ipcRenderer.invoke("proxy:loadJSON", json),
 });

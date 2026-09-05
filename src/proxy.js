@@ -41,11 +41,30 @@ export function DEFAULT_ON_ERROR(e) {
  * @property {ProxyJSONRemoteProxies} remoteProxies
  */
 
+/**
+ * @typedef {Record<number, {seed: string, url: string}>} ProxyListLocalPorts
+ */
+
+/**
+ * @typedef {Record<string, {seed: string, url: string}>} ProxyListFolders
+ */
+
+/**
+ * @typedef {Record<string, {port: number}>} ProxyListRemoteProxies
+ */
+
+/**
+ * @typedef {object} ProxyList
+ * @property {ProxyListFolders} folders
+ * @property {ProxyListLocalPorts} localPorts
+ * @property {ProxyListRemoteProxies} remoteProxies
+ */
+
 export class HyperHttpProxy {
   #dht;
-  /** @type {Map<number, {seed: Buffer, destroy: OnDestroy}>} */
+  /** @type {Map<number, {seed: Buffer, url: string, destroy: OnDestroy}>} */
   #localPorts = new Map();
-  /** @type {Map<string, {seed: Buffer, destroy: OnDestroy}>} */
+  /** @type {Map<string, {seed: Buffer, url: string, destroy: OnDestroy}>} */
   #folders = new Map();
   /** @type {Map<string, {port: number, destroy: OnDestroy}>} */
   #remoteProxies = new Map();
@@ -92,7 +111,7 @@ export class HyperHttpProxy {
 
     const url = makeURL(keyPair.publicKey);
 
-    this.#localPorts.set(port, { seed, destroy });
+    this.#localPorts.set(port, { seed, url, destroy });
 
     return url;
   }
@@ -165,12 +184,15 @@ export class HyperHttpProxy {
       await server.destroy();
     };
 
+    const url = makeURL(server.keyPair.publicKey);
+
     this.#folders.set(rootFolder, {
       seed,
+      url,
       destroy,
     });
 
-    return makeURL(server.keyPair.publicKey);
+    return url;
   }
 
   async destroy() {
@@ -235,6 +257,62 @@ export class HyperHttpProxy {
       localPorts: this.#localPortsJSON,
       folders: this.#foldersJSON,
       remoteProxies: this.#remoteProxiesJSON,
+    };
+  }
+
+  /**
+   * @returns {ProxyListLocalPorts}
+   */
+  get #localPortsList() {
+    /**
+     * @type {ProxyListLocalPorts}
+     */
+    const result = {};
+    for (const [port, { seed, url }] of this.#localPorts.entries()) {
+      result[port] = { seed: seed.toString("hex"), url };
+    }
+
+    return result;
+  }
+
+  /**
+   * @returns {ProxyListFolders}
+   */
+  get #foldersList() {
+    /**
+     * @type {ProxyListFolders}
+     */
+    const result = {};
+    for (const [folder, { seed, url }] of this.#folders.entries()) {
+      result[folder] = { seed: seed.toString("hex"), url };
+    }
+
+    return result;
+  }
+
+  /**
+   * @returns {ProxyListRemoteProxies}
+   */
+  get #remoteProxiesList() {
+    /**
+     * @type {ProxyListRemoteProxies}
+     */
+    const result = {};
+    for (const [url, { port }] of this.#remoteProxies.entries()) {
+      result[url] = { port };
+    }
+
+    return result;
+  }
+
+  /**
+   * @returns {ProxyList}
+   */
+  list() {
+    return {
+      localPorts: this.#localPortsList,
+      folders: this.#foldersList,
+      remoteProxies: this.#remoteProxiesList,
     };
   }
 

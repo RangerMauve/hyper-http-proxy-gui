@@ -30,8 +30,27 @@
 </section>
 
 <script type="module">
+  function abbreviate(url) {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+    if (hostname.length > 16) {
+      parsed.hostname = hostname.slice(0, 8) + "..." + hostname.slice(-8);
+    }
+    return parsed.href;
+  }
+
+  function addEntry(list, label, url) {
+    const li = document.createElement("li");
+    if (label) li.appendChild(document.createTextNode(label));
+    const link = document.createElement("a");
+    link.href = url;
+    link.textContent = abbreviate(url);
+    li.appendChild(link);
+    list.appendChild(li);
+  }
+
   async function loadState() {
-    const state = await window.proxyApi.toJSON();
+    const state = await window.proxyApi.list();
 
     const localList = document.getElementById("localPorts");
     const remoteList = document.getElementById("remotePorts");
@@ -41,22 +60,16 @@
     remoteList.innerHTML = "";
     folderList.innerHTML = "";
 
-    for (const [port, seed] of Object.entries(state.localPorts)) {
-      const li = document.createElement("li");
-      li.textContent = `Port ${port} → ${seed}`;
-      localList.appendChild(li);
+    for (const [port, { url }] of Object.entries(state.localPorts)) {
+      addEntry(localList, `Port ${port} → `, url);
     }
 
-    for (const [url, port] of Object.entries(state.remoteProxies)) {
-      const li = document.createElement("li");
-      li.textContent = `${port} → ${url}`;
-      remoteList.appendChild(li);
+    for (const [url, { port }] of Object.entries(state.remoteProxies)) {
+      addEntry(remoteList, `${port} → `, url);
     }
 
-    for (const [folder, seed] of Object.entries(state.folders)) {
-      const li = document.createElement("li");
-      li.textContent = `${folder} → ${seed}`;
-      folderList.appendChild(li);
+    for (const [folder, { url }] of Object.entries(state.folders)) {
+      addEntry(folderList, `${folder} → `, url);
     }
   }
 

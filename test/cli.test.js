@@ -68,8 +68,9 @@ describe("CLI", () => {
   before(async () => {
     proxy = new MockProxy();
     socketPath = join(tmpdir(), `setkamost-cli-test-${Date.now()}.sock`);
+    const storagePath = join(tmpdir(), `setkamost-cli-test-${Date.now()}-data`);
     env.SETKAMOST_SOCKET = socketPath;
-    daemon = new Daemon({ proxy, socketPath });
+    daemon = new Daemon({ proxy, socketPath, storagePath });
     await daemon.start();
   });
 
