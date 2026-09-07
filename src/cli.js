@@ -1,10 +1,13 @@
 import { parseArgs } from "node:util";
 import { connect } from "node:net";
+import { join, dirname } from "node:path";
+import { mkdir } from "node:fs/promises";
+
 import { JsonRpc } from "./jsonrpc.js";
 import { Daemon } from "./daemon.js";
-import Hyperdht from "hyperdht";
 import { HyperHttpProxy } from "./proxy.js";
-import { join, dirname } from "node:path";
+
+import Hyperdht from "hyperdht";
 import xdg from "xdg-portable";
 
 /**
@@ -16,8 +19,7 @@ import xdg from "xdg-portable";
 const xdgInstance = xdg;
 
 function defaultSocketPath() {
-  const runtime = xdgInstance.runtime();
-  const baseDir = runtime || join(xdgInstance.state(), "setkamost");
+  const baseDir = join(xdgInstance.state(), "setkamost");
   return join(baseDir, "sock");
 }
 
@@ -127,6 +129,7 @@ Options:
  * @param {string} socketPath
  */
 async function daemonStart(socketPath) {
+  await mkdir(dirname(socketPath), { recursive: true });
   const dht = new Hyperdht();
   const proxy = new HyperHttpProxy({ dht });
   const storagePath = join(xdgInstance.data(), "setkamost");

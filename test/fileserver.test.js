@@ -8,7 +8,7 @@ import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT_FOLDER = resolve(__dirname, "../src/");
+const ROOT_FOLDER = resolve(__dirname, "../app/");
 
 /**
  * @param {import('node:test').TestContext} t

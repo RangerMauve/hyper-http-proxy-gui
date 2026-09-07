@@ -1,14 +1,17 @@
 import { app, BrowserWindow, Tray, Menu, ipcMain, dialog } from "electron";
+
 import { connect } from "node:net";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-import { JsonRpc } from "./jsonrpc.js";
-import { Daemon } from "./daemon.js";
-import Hyperdht from "hyperdht";
-import { HyperHttpProxy } from "./proxy.js";
+import { mkdir } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import xdg from "xdg-portable";
+
+import { JsonRpc } from "../src/jsonrpc.js";
+import { Daemon } from "../src/daemon.js";
+import Hyperdht from "hyperdht";
+import { HyperHttpProxy } from "../src/proxy.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,8 +20,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const xdgInstance = xdg;
 
 function defaultSocketPath() {
-  const runtime = xdgInstance.runtime();
-  const baseDir = runtime || join(xdgInstance.state(), "setkamost");
+  const baseDir = join(xdgInstance.state(), "setkamost");
   return join(baseDir, "sock");
 }
 
@@ -59,6 +61,7 @@ function createWindow() {
  */
 async function ensureDaemon() {
   // Try connecting to an existing daemon
+  await mkdir(dirname(SOCKET_PATH), { recursive: true });
   if (existsSync(SOCKET_PATH)) {
     try {
       rpcClient = await connectToDaemon(SOCKET_PATH);

@@ -23,7 +23,7 @@ describe("UI", () => {
 
   test("title is set on document load", async () => {
     win = new BrowserWindow({ show: false, width: 800, height: 600 });
-    win.loadFile(join(__dirname, "..", "src", "index.html"));
+    win.loadFile(join(__dirname, "..", "app", "index.html"));
     await once(win.webContents, "dom-ready");
     const title = await win.webContents.executeJavaScript("document.title");
     assert.equal(title, "Setkamost");
@@ -47,7 +47,7 @@ describe("UI", () => {
       console.error(`Preload error in ${preload}:`, error.message);
     });
 
-    win.loadFile(join(__dirname, "..", "src", "index.html"));
+    win.loadFile(join(__dirname, "..", "app", "index.html"));
     await once(win.webContents, "dom-ready");
 
     await assertEventually(async () => {
@@ -91,7 +91,7 @@ describe("UI", () => {
         console.error(`Preload error in ${preload}:`, error.message);
       });
 
-      formWin.loadFile(join(__dirname, "..", "src", "index.html"));
+      formWin.loadFile(join(__dirname, "..", "app", "index.html"));
       await once(formWin.webContents, "dom-ready");
       // Wait for loadState to finish
       await new Promise((r) => setTimeout(r, 200));
