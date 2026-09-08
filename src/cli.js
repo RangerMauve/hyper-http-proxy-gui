@@ -1,4 +1,4 @@
-import { parseArgs } from "node:util";
+import { Command } from "commander";
 import { connect } from "node:net";
 import { join, dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
@@ -10,10 +10,6 @@ import { HyperHttpProxy } from "./proxy.js";
 import Hyperdht from "hyperdht";
 import xdg from "xdg-portable";
 
-/**
- * @import {ProxyMethods} from "./daemon.js"
- */
-
 /** @type {import("xdg-portable").XDG} */
 // @ts-ignore default export is callable at runtime but types differ
 const xdgInstance = xdg;
@@ -23,385 +19,134 @@ function defaultSocketPath() {
   return join(baseDir, "sock");
 }
 
-const DEFAULT_SOCKET_PATH = defaultSocketPath();
-
 /**
- * @param {object} opts
- * @param {Record<string, string | undefined>} opts.env
- * @param {string[]} opts.args
- * @returns {Promise<void>}
+ * @returns {Command}
  */
-export async function run({ env, args }) {
-  const socketPath = env.SETKAMOST_SOCKET || DEFAULT_SOCKET_PATH;
+export function createProgram() {
+  const prog = new Command();
+  prog
+    .name("setkamost")
+    .description("Expose your HTTP services over peer to peer connections")
+    .option(
+      "--socket <path>",
+      "Socket path",
+      process.env.SETKAMOST_SOCKET || defaultSocketPath(),
+    );
 
-  if (args.length === 0) {
-    await commandHelp([]);
-    return;
-  }
+  const daemon = prog
+    .command("daemon")
+    .description("Manage the daemon process");
 
-  const [command, ...rest] = args;
+  daemon
+    .command("start")
+    .description("Start the daemon")
+    .action(async (opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      await mkdir(dirname(socketPath), { recursive: true });
+      const dht = new Hyperdht();
+      const proxy = new HyperHttpProxy({ dht });
+      const storagePath = join(xdgInstance.data(), "setkamost");
+      const d = new Daemon({ proxy, socketPath, storagePath });
+      await d.start();
+      console.log(`Daemon started (socket: ${socketPath})`);
+    });
 
-  switch (command) {
-    case "daemon":
-      await commandDaemon(rest, socketPath);
-      break;
-    case "list":
-      await commandList(rest, socketPath);
-      break;
-    case "expose-local":
-      await commandExposeLocal(rest, socketPath);
-      break;
-    case "expose-remote":
-      await commandExposeRemote(rest, socketPath);
-      break;
-    case "expose-folder":
-      await commandExposeFolder(rest, socketPath);
-      break;
-    case "--help":
-    case "help":
-      await commandHelp(rest);
-      break;
-    default:
-      console.error(`Unknown command: ${command}`);
-      await commandHelp([]);
-      process.exit(1);
-  }
-}
+  daemon
+    .command("stop")
+    .description("Stop the daemon")
+    .action(async (opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      const { existsSync, readFileSync } = await import("node:fs");
+      const pidPath = socketPath + ".pid";
 
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
- * @returns {Promise<void>}
- */
-async function commandDaemon(args, defaultSocket) {
-  const { values, positionals } = parseArgs({
-    options: {
-      socket: { type: "string" },
-      help: { type: "boolean", short: "h" },
-    },
-    allowPositionals: true,
-    strict: false,
-    args,
-  });
+      if (!existsSync(pidPath)) {
+        console.error("No PID file found. Daemon may not be running.");
+        process.exit(1);
+      }
 
-  if (values.help) {
-    console.log(`Usage: setkamost daemon <subcommand> [options]
+      const pid = Number(readFileSync(pidPath, "utf8"));
+      try {
+        process.kill(pid, "SIGTERM");
+        console.log(`Sent SIGTERM to daemon (PID ${pid})`);
+      } catch {
+        console.error(`Failed to stop daemon (PID ${pid})`);
+        process.exit(1);
+      }
+    });
 
-Subcommands:
-  start   Start the daemon
-  stop    Stop the daemon
+  prog
+    .command("list")
+    .description("List all exposed services")
+    .action(async (opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      const client = await connectRpc(socketPath);
+      try {
+        const state = await client.call("list");
+        console.log(JSON.stringify(state, null, 2));
+      } finally {
+        client.destroy();
+      }
+    });
 
-Options:
-  --socket <path>  Socket path (default: ${defaultSocket})
-  -h, --help       Show help`);
-    return;
-  }
+  prog
+    .command("expose-local")
+    .description("Expose a local HTTP port")
+    .argument("<port>", "Port number to expose")
+    .action(async (port, opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      const client = await connectRpc(socketPath);
+      try {
+        const url = await client.call("exposeLocalPort", [Number(port)]);
+        console.log(url);
+      } finally {
+        client.destroy();
+      }
+    });
 
-  const socketPath = /** @type {string} */ (values.socket || defaultSocket);
-  if (positionals.length === 0) {
-    console.error("Error: missing subcommand (start|stop)");
-    console.log(`Usage: setkamost daemon <subcommand> [options]
+  prog
+    .command("expose-remote")
+    .description("Expose a remote service as local")
+    .argument("<url>", "Remote HyperDHT URL")
+    .option("--port <number>", "Local port (optional, auto-assigned)")
+    .action(async (url, opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      const client = await connectRpc(socketPath);
+      try {
+        const localPort = opts.port ? Number(opts.port) : 0;
+        const port = await client.call("exposeRemoteAsLocal", [url, localPort]);
+        console.log(port);
+      } finally {
+        client.destroy();
+      }
+    });
 
-Subcommands:
-  start   Start the daemon
-  stop    Stop the daemon
+  prog
+    .command("expose-folder")
+    .description("Expose a folder as a file server")
+    .argument("<path>", "Path to the folder")
+    .action(async (path, opts, cmd) => {
+      const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
+      const client = await connectRpc(socketPath);
+      try {
+        const url = await client.call("exposeFolder", [path]);
+        console.log(url);
+      } finally {
+        client.destroy();
+      }
+    });
 
-Options:
-  --socket <path>  Socket path (default: ${defaultSocket})
-  -h, --help       Show help`);
-    process.exit(1);
-  }
-  /** @type {string[]} */
-  const pos = positionals;
-  const subcommand = pos[0];
-
-  if (subcommand === "start") {
-    await daemonStart(socketPath);
-  } else if (subcommand === "stop") {
-    await daemonStop(socketPath);
-  } else {
-    console.error(`Unknown daemon subcommand: ${subcommand}`);
-    process.exit(1);
-  }
+  return prog;
 }
 
 /**
  * @param {string} socketPath
- */
-async function daemonStart(socketPath) {
-  await mkdir(dirname(socketPath), { recursive: true });
-  const dht = new Hyperdht();
-  const proxy = new HyperHttpProxy({ dht });
-  const storagePath = join(xdgInstance.data(), "setkamost");
-  const daemon = new Daemon({ proxy, socketPath, storagePath });
-
-  await daemon.start();
-  console.log(`Daemon started (socket: ${socketPath})`);
-}
-
-/**
- * @param {string} socketPath
- */
-async function daemonStop(socketPath) {
-  const { existsSync, readFileSync } = await import("node:fs");
-  const pidPath = socketPath + ".pid";
-
-  if (!existsSync(pidPath)) {
-    console.error("No PID file found. Daemon may not be running.");
-    process.exit(1);
-  }
-
-  const pid = Number(readFileSync(pidPath, "utf8"));
-  try {
-    process.kill(pid, "SIGTERM");
-    console.log(`Sent SIGTERM to daemon (PID ${pid})`);
-  } catch {
-    console.error(`Failed to stop daemon (PID ${pid})`);
-    process.exit(1);
-  }
-}
-
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
  * @returns {Promise<JsonRpc>}
  */
-function connectRpc(args, defaultSocket) {
-  const { values, positionals } = parseArgs({
-    options: {
-      socket: { type: "string" },
-      help: { type: "boolean", short: "h" },
-    },
-    allowPositionals: true,
-    strict: false,
-    args,
-  });
-
-  if (values.help) {
-    throw new Error("help-requested");
-  }
-
-  const socketPath = /** @type {string} */ (values.socket || defaultSocket);
-
+function connectRpc(socketPath) {
   return new Promise((resolve, reject) => {
     const socket = connect(socketPath, () => {
       resolve(new JsonRpc(socket));
     });
     socket.on("error", reject);
   });
-}
-
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
- */
-async function commandList(args, defaultSocket) {
-  let client;
-  try {
-    client = await connectRpc(args, defaultSocket);
-    const state = await client.call("list");
-    console.log(JSON.stringify(state, null, 2));
-  } catch (err) {
-    if (err.message === "help-requested") {
-      console.log(`Usage: setkamost list [options]
-
-List all exposed services.
-
-Options:
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-    } else {
-      throw err;
-    }
-  } finally {
-    if (client) client.destroy();
-  }
-}
-
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
- */
-async function commandExposeLocal(args, defaultSocket) {
-  let client;
-  try {
-    client = await connectRpc(args, defaultSocket);
-    const { positionals } = parseArgs({
-      options: {
-        socket: { type: "string" },
-        help: { type: "boolean", short: "h" },
-      },
-      allowPositionals: true,
-      args,
-    });
-
-    if (positionals.length === 0) {
-      console.error("Error: missing <port> argument");
-      console.log(`Usage: setkamost expose-local <port> [options]
-
-Expose a local HTTP port over HyperDHT.
-
-Options:
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-      process.exit(1);
-    }
-
-    /** @type {string[]} */
-    const pos = positionals;
-    const port = Number(pos[0]);
-    const url = await client.call("exposeLocalPort", [port]);
-    console.log(url);
-  } catch (err) {
-    if (err.message === "help-requested") {
-      console.log(`Usage: setkamost expose-local <port> [options]
-
-Expose a local HTTP port over HyperDHT.
-
-Options:
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-    } else {
-      throw err;
-    }
-  } finally {
-    if (client) client.destroy();
-  }
-}
-
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
- */
-async function commandExposeRemote(args, defaultSocket) {
-  let client;
-  try {
-    client = await connectRpc(args, defaultSocket);
-    const { values, positionals } = parseArgs({
-      options: {
-        socket: { type: "string" },
-        port: { type: "string" },
-        help: { type: "boolean", short: "h" },
-      },
-      allowPositionals: true,
-      args,
-    });
-
-    if (positionals.length === 0) {
-      console.error("Error: missing <url> argument");
-      console.log(`Usage: setkamost expose-remote <url> [options]
-
-Expose a remote HyperDHT service as a local port.
-
-Options:
-  --port <number>  Local port (optional, auto-assigned)
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-      process.exit(1);
-    }
-
-    /** @type {string[]} */
-    const pos = positionals;
-    const url = pos[0];
-    const localPort = values.port ? Number(values.port) : 0;
-    const port = await client.call("exposeRemoteAsLocal", [url, localPort]);
-    console.log(port);
-  } catch (err) {
-    if (err.message === "help-requested") {
-      console.log(`Usage: setkamost expose-remote <url> [options]
-
-Expose a remote HyperDHT service as a local port.
-
-Options:
-  --port <number>  Local port (optional, auto-assigned)
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-    } else {
-      throw err;
-    }
-  } finally {
-    if (client) client.destroy();
-  }
-}
-
-/**
- * @param {string[]} args
- * @param {string} defaultSocket
- */
-async function commandExposeFolder(args, defaultSocket) {
-  let client;
-  try {
-    client = await connectRpc(args, defaultSocket);
-    const { positionals } = parseArgs({
-      options: {
-        socket: { type: "string" },
-        help: { type: "boolean", short: "h" },
-      },
-      allowPositionals: true,
-      args,
-    });
-
-    if (positionals.length === 0) {
-      console.error("Error: missing <path> argument");
-      console.log(`Usage: setkamost expose-folder <path> [options]
-
-Expose a folder as a HyperDHT file server.
-
-Options:
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-      process.exit(1);
-    }
-
-    /** @type {string[]} */
-    const pos = positionals;
-    const folder = pos[0];
-    const url = await client.call("exposeFolder", [folder]);
-    console.log(url);
-  } catch (err) {
-    if (err.message === "help-requested") {
-      console.log(`Usage: setkamost expose-folder <path> [options]
-
-Expose a folder as a HyperDHT file server.
-
-Options:
-  --socket <path>  Socket path
-  -h, --help       Show help`);
-    } else {
-      throw err;
-    }
-  } finally {
-    if (client) client.destroy();
-  }
-}
-
-/**
- * @param {string[]} args
- */
-async function commandHelp(args) {
-  const context = args[0];
-  if (context) {
-    // Re-route to the specific command with --help
-    const cmdMap = {
-      daemon: "commandDaemon",
-      list: "commandList",
-      "expose-local": "commandExposeLocal",
-      "expose-remote": "commandExposeRemote",
-      "expose-folder": "commandExposeFolder",
-    };
-    // Already handled by individual commands
-    return;
-  }
-
-  console.log(`Usage: setkamost <command> [options]
-
-Commands:
-  daemon          Manage the daemon process
-  list            List all exposed services
-  expose-local    Expose a local HTTP port
-  expose-remote   Expose a remote service as local
-  expose-folder   Expose a folder as a file server
-  help            Show this help message
-
-Use 'setkamost <command> --help' for more information.`);
 }

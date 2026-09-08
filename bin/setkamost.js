@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { run } from "../src/cli.js";
+import { createProgram } from "../src/cli.js";
 
-run({ env: process.env, args: process.argv.slice(2) }).catch((err) => {
+createProgram().parseAsync(process.argv).catch((err) => {
   console.error(err);
   process.exit(1);
 });
