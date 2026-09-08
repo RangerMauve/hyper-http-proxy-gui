@@ -2,6 +2,6 @@
 import { createProgram } from "../src/cli.js";
 
 createProgram().parseAsync(process.argv).catch((err) => {
-  console.error(err);
+  console.error(`Error: ${err.message}`);
   process.exit(1);
 });

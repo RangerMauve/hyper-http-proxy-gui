@@ -147,6 +147,17 @@ function connectRpc(socketPath) {
     const socket = connect(socketPath, () => {
       resolve(new JsonRpc(socket));
     });
-    socket.on("error", reject);
+    socket.on("error", (err) => {
+      if (err.code === "ECONNREFUSED" || err.code === "ENOENT") {
+        reject(
+          new Error(
+            `Could not connect to the setkamost daemon (socket: ${socketPath}).\n` +
+              `The daemon doesn't appear to be running. Start it with: setkamost daemon start`,
+          ),
+        );
+      } else {
+        reject(err);
+      }
+    });
   });
 }
