@@ -49,6 +49,14 @@ export function createProgram() {
       const d = new Daemon({ proxy, socketPath, storagePath });
       await d.start();
       console.log(`Daemon started (socket: ${socketPath})`);
+
+      const shutdown = async () => {
+        await d.stop();
+        await proxy.destroy();
+        process.exit(0);
+      };
+      process.on("SIGTERM", shutdown);
+      process.on("SIGINT", shutdown);
     });
 
   daemon
