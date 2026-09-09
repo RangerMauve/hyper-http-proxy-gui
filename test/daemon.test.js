@@ -119,6 +119,15 @@ describe("Daemon", () => {
       client.destroy();
     });
 
+    it("exposeFolder rejects a relative path", async () => {
+      const client = await connectClient();
+      await assert.rejects(
+        () => client.call("exposeFolder", ["relative/path"]),
+        /must be absolute/,
+      );
+      client.destroy();
+    });
+
     it("multiple clients can connect simultaneously", async () => {
       const client1 = await connectClient();
       const client2 = await connectClient();

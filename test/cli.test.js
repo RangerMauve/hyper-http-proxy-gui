@@ -130,5 +130,28 @@ describe("CLI", () => {
       const state = JSON.parse(log);
       assert.ok(state.folders["/tmp/sharedocs"], "should have folder");
     });
+
+    it("resolves relative paths before passing to RPC", async () => {
+      proxy.clearCalls();
+      const { log } = await runCli([
+        "expose-folder",
+        "sharedocs",
+        "--socket",
+        socketPath,
+      ]);
+      assert.ok(log.trim().startsWith("hyper+http://"), "should return a URL");
+      const folderCall = proxy.calls.find((c) => c.method === "exposeFolder");
+      assert.ok(folderCall, "exposeFolder should have been called");
+      const receivedPath = /** @type {string} */ (folderCall.args[0]);
+      assert.ok(
+        receivedPath.startsWith("/"),
+        `daemon should receive absolute path, got: ${receivedPath}`,
+      );
+      assert.equal(
+        receivedPath,
+        join(process.cwd(), "sharedocs"),
+        "path should be resolved against cwd",
+      );
+    });
   });
 });

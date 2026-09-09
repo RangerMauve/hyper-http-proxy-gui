@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { connect } from "node:net";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
 
 import { JsonRpc } from "./jsonrpc.js";
@@ -128,7 +128,7 @@ export function createProgram() {
       const socketPath = /** @type {string} */ (cmd.optsWithGlobals().socket);
       const client = await connectRpc(socketPath);
       try {
-        const url = await client.call("exposeFolder", [path]);
+        const url = await client.call("exposeFolder", [resolve(path)]);
         console.log(url);
       } finally {
         client.destroy();

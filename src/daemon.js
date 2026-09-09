@@ -1,6 +1,6 @@
 import { createServer } from "node:net";
 import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { JsonRpc } from "./jsonrpc.js";
 
 /**
@@ -147,8 +147,12 @@ export class Daemon {
      * @param {unknown} seedHex
      */
     const handleExposeFolder = async (rootFolder, seedHex) => {
+      const folder = String(rootFolder);
+      if (!isAbsolute(folder)) {
+        throw new Error(`Folder path must be absolute, got: ${folder}`);
+      }
       const result = await this.#proxy.exposeFolder(
-        String(rootFolder),
+        folder,
         /** @type {Buffer | undefined} */ (seedHex || undefined),
       );
       await this.#saveState();
