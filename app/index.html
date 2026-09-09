@@ -1,6 +1,7 @@
 <!doctype html>
 <title>Setkamost</title>
 <h1>Setkamost</h1>
+<style>@import url("./style.css");</style>
 <section>
   <h2>Expose Local</h2>
   <ul id="localPorts"></ul>
@@ -29,6 +30,8 @@
 </section>
 
 <script type="module">
+  document.documentElement.dataset.os = window.proxyApi.platform;
+
   function abbreviate(url) {
     const parsed = new URL(url);
     const hostname = parsed.hostname;

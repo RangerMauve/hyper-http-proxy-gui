@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("proxyApi", {
+  /** @type {string} The OS platform ("darwin" | "win32" | "linux" | …). */
+  platform: process.platform,
   /** @type {(port: number, seedHex: string) => Promise<void>} */
   exposeLocalPort: (port, seedHex) =>
     ipcRenderer.invoke("proxy:exposeLocalPort", port, seedHex),

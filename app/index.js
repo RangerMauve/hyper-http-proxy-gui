@@ -38,9 +38,13 @@ let daemon = null;
 let ownsDaemon = false;
 
 function createWindow() {
+  // @ts-ignore vibrancy: 'dark' works at runtime but is missing from Electron types
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    // Per-OS native window decorations
+    ...(process.platform === "win32" ? { backgroundMaterial: "mica" } : {}),
+    ...(process.platform === "darwin" ? { vibrancy: "dark" } : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -48,11 +52,36 @@ function createWindow() {
     },
   });
 
+  applyWindowDecorations(mainWindow);
+
   mainWindow.loadFile(join(__dirname, "index.html"));
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+/**
+ * Apply OS-specific native window effects (blur / material).
+ * Guarded so unsupported platforms are a no-op.
+ * @param {BrowserWindow} win
+ */
+function applyWindowDecorations(win) {
+  if (process.platform === "darwin") {
+    try {
+      win.setVibrancy("fullscreen-ui");
+      win.setBackgroundColor("#00000000");
+    } catch {
+      /* vibrancy unavailable */
+    }
+  }
+  if (process.platform === "win32") {
+    try {
+      win.setBackgroundMaterial("mica");
+    } catch {
+      /* background material unavailable */
+    }
+  }
 }
 
 /**
