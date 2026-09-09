@@ -15,6 +15,6 @@
     "resolveJsonModule": true,
     "useUnknownInCatchVariables":false
   },
-  "include": ["src/**/*.js", "app/**/*.js", "types/**/*.d.ts", "test/**/*.js"],
+  "include": ["src/**/*.js", "app/**/*.js", "types/**/*.d.ts", "test/**/*.js", "bin/*.js"],
   "exclude": ["node_modules", "dist"]
 }

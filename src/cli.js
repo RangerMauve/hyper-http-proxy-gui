@@ -148,7 +148,8 @@ function connectRpc(socketPath) {
       resolve(new JsonRpc(socket));
     });
     socket.on("error", (err) => {
-      if (err.code === "ECONNREFUSED" || err.code === "ENOENT") {
+      const nodeErr = /** @type {Error & { code?: string }} */ (err);
+      if (nodeErr.code === "ECONNREFUSED" || nodeErr.code === "ENOENT") {
         reject(
           new Error(
             `Could not connect to the setkamost daemon (socket: ${socketPath}).\n` +

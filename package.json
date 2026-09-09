@@ -28,7 +28,8 @@
   },
   "files": [
     "src",
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "test": "node --test test/*.test.js && xvfb-run --auto-servernum npx electron --no-sandbox test/ui.js",
