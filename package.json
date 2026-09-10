@@ -49,6 +49,23 @@
     ],
     "extraMetadata": {
       "main": "app/index.js"
+    },
+    "mac": {
+      "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "linux": {
+      "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
+      "target": ["deb", "AppImage", "apk", "pacman"],
+      "category": "Network;FileTransfer:P2P"
     }
   },
   "dependencies": {
